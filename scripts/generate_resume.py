@@ -90,7 +90,7 @@ pdf.para(
 # ── Education ─────────────────────────────────────────────────────────────
 pdf.section("Education")
 pdf.entry(
-    "B.E. Computer Engineering - Ongoing",
+    "B.Tech. Computer Engineering - Ongoing",
     "",
     "AISSMS Institute of Information Technology, Savitribai Phule Pune University.\n"
     "Core coursework across programming, data structures, mathematics and systems, "

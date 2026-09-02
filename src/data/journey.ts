@@ -13,7 +13,7 @@ export interface JourneyItem {
 
 export const journey: JourneyItem[] = [
   {
-    title: 'Started B.E. Computer Engineering',
+    title: 'Started B.Tech. Computer Engineering',
     detail:
       'AISSMS Institute of Information Technology, Savitribai Phule Pune University. Fundamentals first: programming, mathematics, systems.',
     tag: 'Education',

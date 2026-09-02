@@ -20,7 +20,7 @@ export const siteConfig = {
   // ---------------------------------------------------------------------
 
   resumePath: '/resume.pdf', // drop the file into /public — buttons activate automatically
-  siteUrl: 'https://aditya-mengar.vercel.app', // canonical URL placeholder — update after deploy
+  siteUrl: 'https://my-portfolio-gamma-two-ou648auiiu.vercel.app', // canonical URL placeholder — update after deploy
 } as const
 
 export function hasLink(url: string | undefined | null): boolean {

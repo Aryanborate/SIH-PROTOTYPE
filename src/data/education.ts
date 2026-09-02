@@ -8,7 +8,7 @@ export interface Education {
 
 export const education: Education[] = [
   {
-    degree: 'B.E. Computer Engineering',
+    degree: 'B.Tech. Computer Engineering',
     institution: 'AISSMS Institute of Information Technology',
     university: 'Savitribai Phule Pune University',
     status: 'Ongoing',
