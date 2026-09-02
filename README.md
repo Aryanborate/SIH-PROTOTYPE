@@ -12,6 +12,10 @@ early-career work **honestly**: real projects, real limitations, no invented met
 - **Live 3D hero** — a "Data Intelligence Constellation": nodes, connections, orbiting
   rings and particles rendered with React Three Fiber. Mouse parallax, node hover/click
   interactions with labelled categories. Not a video, not a gimmick.
+- **Live 3D background** — a fixed WebGL layer behind the whole page: a deep particle
+  field with constellation clusters and faint orbital rings. The camera traverses the
+  volume as you scroll and parallaxes with the mouse. Scroll/mouse input is read
+  through refs (zero React re-renders); dimmed so text always stays readable.
 - **3D skill constellation** — a structured technical diagram of the 8 verified skills
   with hover tooltips and highlighted edges (desktop only; elegant cards on mobile).
 - **Deep-linkable case studies** — every project opens an immersive case-study modal,

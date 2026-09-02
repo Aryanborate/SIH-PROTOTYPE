@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Background from './components/layout/Background'
 import Navbar from './components/navigation/Navbar'
 import CustomCursor from './components/cursor/CustomCursor'
 import Loader from './components/loader/Loader'
+
+const BackgroundScene = lazy(() => import('./components/3d/BackgroundScene'))
 import Hero from './components/sections/Hero'
 import About from './components/sections/About'
 import Skills from './components/sections/Skills'
@@ -47,6 +49,9 @@ export default function App() {
     <>
       <CustomCursor />
       <Background />
+      <Suspense fallback={null}>
+        <BackgroundScene />
+      </Suspense>
       <AnimatePresence>{!booted && <Loader key="loader" />}</AnimatePresence>
 
       <a

@@ -1,10 +1,10 @@
 /**
- * Fixed ambient background: soft radial light, fine grid, film grain.
- * Deliberately quiet — it must never compete with content.
+ * Static ambient layer (deepest): soft radial light, fine grid, film grain.
+ * Sits behind the live 3D background field (-z-20) and all content.
  */
 export default function Background() {
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-ink-900">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-30 overflow-hidden">
       <div
         className="absolute inset-0"
         style={{

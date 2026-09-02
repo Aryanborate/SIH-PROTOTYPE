@@ -13,10 +13,10 @@ export const siteConfig = {
   location: 'Pune, Maharashtra, India',
 
   // --- Fill these in before launch -------------------------------------
-  email: '', // e.g. 'you@example.com' → enables the EMAIL button
-  linkedin: '', // e.g. 'https://www.linkedin.com/in/your-handle' → enables LINKEDIN
-  github: '', // e.g. 'https://github.com/your-handle' → enables GitHub buttons
-  githubUsername: '', // optional: username for the live repositories fetch
+  email: 'mengagraditya@gmail.com', // e.g. 'you@example.com' → enables the EMAIL button
+  linkedin: 'https://www.linkedin.com/in/aditya-mengar-b86a34385', // e.g. 'https://www.linkedin.com/in/your-handle' → enables LINKEDIN
+  github: 'https://github.com/adityamengar', // e.g. 'https://github.com/your-handle' → enables GitHub buttons
+  githubUsername: 'adityamengar', // optional: username for the live repositories fetch
   // ---------------------------------------------------------------------
 
   resumePath: '/resume.pdf', // drop the file into /public — buttons activate automatically
