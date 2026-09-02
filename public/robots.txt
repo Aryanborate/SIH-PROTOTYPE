@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aditya-mengar.vercel.app/sitemap.xml
