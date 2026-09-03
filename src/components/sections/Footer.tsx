@@ -67,7 +67,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="container-pad flex flex-col gap-2 border-t border-white/[0.05] py-6 font-mono text-[10px] tracking-[0.14em] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="container-pad flex flex-col gap-2 border-t border-white/[0.05] pb-28 pt-6 font-mono text-[10px] tracking-[0.14em] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <p>DESIGNED & BUILT BY {siteConfig.name.toUpperCase()}</p>
         <p>© 2026 {siteConfig.name.toUpperCase()} · REACT · THREE.JS</p>
       </div>

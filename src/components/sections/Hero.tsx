@@ -94,7 +94,7 @@ export default function Hero({
       </div>
 
       <motion.div
-        className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 lg:flex"
+        className="absolute bottom-32 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 lg:flex"
         initial={{ opacity: 0 }}
         animate={booted ? { opacity: 1 } : {}}
         transition={{ delay: 1.4, duration: 0.8 }}

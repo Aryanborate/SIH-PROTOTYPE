@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Background from './components/layout/Background'
 import Navbar from './components/navigation/Navbar'
+import Dock from './components/navigation/Dock'
 import CustomCursor from './components/cursor/CustomCursor'
 import Loader from './components/loader/Loader'
 
@@ -62,6 +63,7 @@ export default function App() {
       </a>
 
       <Navbar />
+      <Dock />
 
       <main>
         <Hero booted={booted} onSceneReady={onSceneReady} />
