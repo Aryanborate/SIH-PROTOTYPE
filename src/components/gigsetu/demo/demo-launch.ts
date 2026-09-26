@@ -1,6 +1,6 @@
 'use client'
 
-import { api } from '@/lib/api-client'
+import { api, signInAs } from '@/lib/api-client'
 import { useAppStore } from '@/store/app-store'
 import { useDemoStore } from '@/store/demo-store'
 import type { DemoUser } from '@/lib/types'
@@ -25,7 +25,8 @@ export async function resetDemoState(qc?: { clear: () => void }): Promise<void> 
 
 /** Log the demo customer identity in (without touching demo playback state). */
 export async function loginDemoCustomer(): Promise<DemoUser> {
-  const res = await api.get<{ ok: boolean; user: DemoUser }>('/api/session?role=CUSTOMER')
+  const res = await signInAs<{ ok: boolean; user: DemoUser }>('CUSTOMER')
+  if (!res.user) throw new Error('No CUSTOMER demo identity. Run: npm run db:seed')
   useAppStore.getState().login(res.user)
   return res.user
 }
@@ -37,8 +38,11 @@ export async function loginDemoCustomer(): Promise<DemoUser> {
  * `qc` is the TanStack QueryClient (from useQueryClient()) so dashboards refetch clean.
  */
 export async function startSihDemo(qc?: { clear: () => void }): Promise<void> {
-  await resetDemoState(qc)
+  // Sign in BEFORE resetting. POST /api/demo/reset is a mutating route, so the
+  // proxy demands a session cookie; doing it the other way round 401'd and the
+  // failure was swallowed, leaving the previous run's demo artifacts in place.
   await loginDemoCustomer()
+  await resetDemoState(qc)
   useDemoStore.getState().start()
 }
 

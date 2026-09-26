@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAppStore, ROLE_VIEWS, type View } from '@/store/app-store'
 import { useDemoStore } from '@/store/demo-store'
 import { t, LANG_LABEL } from '@/lib/i18n'
-import { api, timeAgo } from '@/lib/api-client'
+import { api, signInAs, timeAgo } from '@/lib/api-client'
 import { Logo, PrototypeNotice } from './shared/ui-kit'
 import { NotificationCenter } from './shared/notification-center'
 import { GeoMap } from './shared/geo-map'
@@ -195,6 +195,7 @@ function NotificationsBell({ user }: { user: DemoUser }) {
 
 function RoleSwitcher({ user }: { user: DemoUser }) {
   const { login } = useAppStore()
+  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -219,8 +220,17 @@ function RoleSwitcher({ user }: { user: DemoUser }) {
               disabled={user.role === r}
               onClick={async () => {
                 setOpen(false)
-                const res = await api.get<{ ok: boolean; user: DemoUser }>(`/api/session?role=${r}`)
-                login(res.user)
+                try {
+                  const res = await signInAs<{ ok: boolean; user: DemoUser }>(r)
+                  if (!res.user) throw new Error(`No demo identity available for ${r}. Run: npm run db:seed`)
+                  login(res.user)
+                } catch (e) {
+                  toast({
+                    title: `Could not switch to ${r.replace(/_/g, ' ')}`,
+                    description: e instanceof Error ? e.message : 'Unknown error.',
+                    variant: 'destructive',
+                  })
+                }
               }}
             >
               {r.replace(/_/g, ' ')}

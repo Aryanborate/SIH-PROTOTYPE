@@ -371,9 +371,19 @@ export function DemoPanel() {
   }, [])
 
   async function doReset() {
-    await resetDemoState(qc)
-    useDemoStore.getState().stop()
-    toast({ title: 'Demo state reset', description: 'All demo bookings, notifications and exchange records were removed.' })
+    try {
+      await resetDemoState(qc)
+      useDemoStore.getState().stop()
+      toast({ title: 'Demo state reset', description: 'All demo bookings, notifications and exchange records were removed.' })
+    } catch (e) {
+      // Never claim a reset succeeded if something actually threw.
+      useDemoStore.getState().stop()
+      toast({
+        title: 'Reset could not complete',
+        description: e instanceof Error ? e.message : 'Unknown error.',
+        variant: 'destructive',
+      })
+    }
   }
 
   // Keyboard controls — never hijack typing

@@ -65,6 +65,48 @@ async function main() {
   r = await req('POST', '/api/auth', { role: 'SUPERADMIN' }, { noAuth: true })
   ok(r.s === 400, 'an unknown role is rejected', r.j?.error)
 
+  // ---------- 1b. CLIENT LOGIN CONTRACT (regression) ----------
+  // Regression guard. Every role button, the role switcher, the platform
+  // console and the SIH demo launcher sign in through the client. They used to
+  // call `GET /api/session?role=X`, which was closed down as a privilege-
+  // escalation oracle and now only answers "who am I" — so the UI received
+  // `{ user: null }`, handed null to the store, and every button failed with a
+  // misleading "SIH demo engine not ready" toast. These assertions fail loudly
+  // if sign-in is ever routed through the read-only endpoint again.
+  section('1b client sign-in contract (regression: was "demo engine not ready")')
+  const ROLES: [string, string][] = [
+    ['CUSTOMER', 'Anita Deshmukh'],
+    ['WORKER', 'Rajesh Kumar'],
+    ['COOP_ADMIN', ''],
+    ['TALUKA_COORD', ''],
+    ['DISTRICT_COORD', ''],
+    ['STATE_ADMIN', ''],
+    ['NATIONAL_ADMIN', ''],
+    ['INSTITUTION', ''],
+    ['PLATFORM_ADMIN', 'GigSetu Ops'],
+  ]
+  for (const [role, expectName] of ROLES) {
+    const res = await req('POST', '/api/auth', { role }, { noAuth: true })
+    const u = res.j?.user
+    const good = res.s === 200 && u?.role === role && typeof u?.name === 'string' && u.name.length > 0
+    ok(good, `signInAs(${role}) returns a usable identity`, good ? `${u.name} · ${u.orgName ?? '—'}` : `status=${res.s} ${res.j?.error ?? ''}`)
+    if (expectName) ok(u?.name === expectName, `…and it is the expected persona (${expectName})`, String(u?.name))
+  }
+
+  r = await req('GET', '/api/session?role=CUSTOMER')
+  ok(r.s === 200 && r.j?.user?.role !== 'CUSTOMER' || r.j?.user === null, 'GET /api/session?role= is NOT a login path', `user=${JSON.stringify(r.j?.user?.role ?? null)}`)
+
+  r = await req('GET', '/api/auth/identities')
+  ok(r.s === 200 && r.j?.identities?.length === 9, 'GET /api/auth/identities lists every persona read-only', `n=${r.j?.identities?.length}`)
+
+  const beforeList = (await req('GET', '/api/session')).j?.user?.role
+  await req('GET', '/api/auth/identities')
+  const afterList = (await req('GET', '/api/session')).j?.user?.role
+  ok(beforeList === afterList, 'listing identities does not mutate the session', `${beforeList} -> ${afterList}`)
+
+  // Back to the demo customer for the remaining scenarios.
+  await req('POST', '/api/auth', { role: 'CUSTOMER' }, { noAuth: true })
+
   // ---------- 2. GEOAPIFY (5 products) ----------
   section('2 GeoApify integration')
   r = await req('GET', '/api/geo/autocomplete?q=Kothrud')
@@ -290,7 +332,106 @@ async function main() {
   r = await req('GET', '/api/demo/reset')
   ok(r.s === 200, 'reset dry-run reports what it would remove', JSON.stringify(r.j))
   r = await req('POST', '/api/demo/reset')
-  ok(r.s === 200, 'RESET DEMO runs', JSON.stringify(r.j))
+  // ---------- 14. THE 16-STEP SIH DEMO WALKTHROUGH ----------
+  // Replays exactly the API sequence the client-side demo engine performs when
+  // a judge clicks "START SIH DEMO" (see demo-engine.tsx runStep). The engine is
+  // a React component and cannot be driven from here, but every step it performs
+  // is one of these calls — if one regresses, the button silently stalls on that
+  // step. Step numbers match DEMO_SCRIPT.
+  section('14 the 16-step SIH demo walkthrough (what START SIH DEMO does)')
+
+  // The demo launcher signs the customer in FIRST, then resets (the reset is a
+  // mutating route and needs a session). Reset itself is platform-only.
+  await req('POST', '/api/auth', { role: 'PLATFORM_ADMIN' }, { noAuth: true })
+  const dem = await req('POST', '/api/demo/reset')
+  ok(dem.s === 200, 'demo launcher: reset runs with a session', `status=${dem.s}`)
+  await req('POST', '/api/auth', { role: 'CUSTOMER' }, { noAuth: true })
+  const who = await req('GET', '/api/session')
+  ok(who.j?.user?.role === 'CUSTOMER', 'demo launcher: customer identity is live in the cookie', who.j?.user?.name)
+
+  // 1 wa-request — the Marathi opener
+  let wa = await req('POST', '/api/ai/wa-bot', { customerId: CUSTOMER, message: MARATHI, lang: 'mr', state: { stage: 'new' } })
+  ok(wa.s === 200 && wa.j?.replies?.length > 0, '1  wa-request    Marathi opener gets a reply', wa.j?.replies?.[0]?.text?.slice(0, 34))
+  let demoSt = wa.j?.state ?? { stage: 'new' }
+
+  // 2 ai-understand
+  let an = await req('POST', '/api/ai/analyze', { description: MARATHI, lang: 'mr' })
+  ok(an.s === 200 && an.j?.analysis?.categoryKey === 'plumber', '2  ai-understand  categorised as plumber', `${an.j?.analysis?.categoryKey} / ${an.j?.analysis?.urgency}`)
+
+  // 3 wa-location — the engine walks the bot to the "ready" card, which is what
+  //    actually performs the geocode + match + fair-price steps.
+  for (const msg of ['Plumber', 'pipe burst, urgent', 'Kothrud', 'now']) {
+    wa = await req('POST', '/api/ai/wa-bot', { customerId: CUSTOMER, message: msg, lang: 'en', state: demoSt })
+    demoSt = wa.j?.state
+  }
+  ok(demoSt?.stage === 'ready' && !!wa.j?.workerCard, '3  wa-location   conversation reaches the ready card', `${wa.j?.workerCard?.workerName} ${wa.j?.workerCard?.distanceKm} km`)
+
+  // 4/5 match-search + match-select, reported independently by the engine
+  let m = await req('POST', '/api/match', { categoryKey: 'plumber', area: 'Kothrud', urgency: 'EMERGENCY', customerId: CUSTOMER })
+  ok(m.s === 200 && m.j?.pipeline?.length === 6, '4  match-search  6-stage pipeline runs', (m.j?.pipeline ?? []).map((x: any) => `${x.stage}:${x.count}`).join(' '))
+  ok(!!m.j?.best, '5  match-select   exactly one best worker', m.j?.best?.name)
+
+  // 6 fair-price
+  const pe = m.j?.priceEstimate
+  ok(pe?.floor > 0 && pe?.ceiling > pe?.floor, '6  fair-price    a fair range is quoted', `₹${pe?.floor}-${pe?.ceiling} total ₹${pe?.total}`)
+
+  // 7 confirm
+  const conf = await req('POST', '/api/ai/wa-bot', { customerId: CUSTOMER, message: '', lang: 'en', state: demoSt, confirm: true })
+  ok(conf.s === 200 && !!conf.j?.bookingId && !!conf.j?.bookingRef, '7  confirm       booking created', conf.j?.bookingRef)
+  const DBOOK = conf.j?.bookingId
+  const DREF = conf.j?.bookingRef
+
+  // 8/9/10 worker-accept -> on-the-way -> complete. The engine polls GET
+  //     /api/bookings/:id and the booking engine auto-advances the timeline.
+  await req('POST', '/api/auth', { role: 'WORKER' }, { noAuth: true })
+  let bk: any = null
+  for (let i = 0; i < 26; i += 1) {
+    const g = await req('GET', `/api/bookings/${DBOOK}`)
+    bk = g.j?.booking
+    if (bk && ['COMPLETED', 'PAID', 'REVIEWED'].includes(bk.status)) break
+    await new Promise((x) => setTimeout(x, 8000))
+  }
+  ok(bk?.status === 'COMPLETED', '8-10 worker-accept/on-the-way/complete  timeline advances', (bk?.timeline ?? []).map((t: any) => t.status).join(' > '))
+
+  // 11 payment — the customer settles, so be signed in as the customer.
+  await req('POST', '/api/auth', { role: 'CUSTOMER' }, { noAuth: true })
+  const pay = await req('PATCH', `/api/bookings/${DBOOK}`, { action: 'pay', method: 'UPI (Demo Payment)' })
+  const demoSp = pay.j?.booking?.payment ?? {}
+  ok(pay.j?.booking?.status === 'PAID', '11 payment      booking settles', `${pay.j?.booking?.status ?? pay.s} ${pay.j?.error ?? ''}`)
+  ok(Math.abs((demoSp.workerShare ?? 0) + (demoSp.coopCommission ?? 0) + (demoSp.welfare ?? 0) + (demoSp.platformFee ?? 0) - (demoSp.amount ?? 0)) <= 1, '11 payment      the 4-way split is transparent', `worker ₹${demoSp.workerShare} / coop ₹${demoSp.coopCommission} / welfare ₹${demoSp.welfare} / platform ₹${demoSp.platformFee}`)
+
+  // 12 rating — the route derives the worker from the booking; it takes
+  //     `rating`/`review`, and refuses an unsettled job.
+  const rat = await req('POST', '/api/ratings', { bookingId: DBOOK, rating: 5, review: 'Fast, neat work and the price matched the quote.' })
+  ok(rat.s === 200, '12 rating       trust score is two-sided', `status=${rat.s} ${rat.j?.error ?? ''}`)
+
+  // 13 coop-update
+  await req('POST', '/api/auth', { role: 'COOP_ADMIN' }, { noAuth: true })
+  const cq = await req('GET', `/api/coop?id=${m.j?.best?.cooperativeId ?? ''}`)
+  ok(cq.s === 200 && !!cq.j?.cooperative?.name, '13 coop-update  cooperative dashboard is live', `${cq.j?.cooperative?.name} · ${cq.j?.cooperative?.workerCount} workers`)
+
+  // 14 district-demand
+  await req('POST', '/api/auth', { role: 'DISTRICT_COORD' }, { noAuth: true })
+  const dd = await req('GET', '/api/hierarchy/dashboard?level=district')
+  ok(dd.s === 200 && !!dd.j?.district?.name, '14 district-demand  district rollup is live', `${dd.j?.district?.name} · ${dd.j?.district?.jobsToday} jobs today`)
+
+  // 15 ai-shortage
+  const gap = await req('GET', '/api/skill-gaps?district=Pune')
+  ok(gap.s === 200 && gap.j?.totalGap > 0, '15 ai-shortage  capacity shortage detected', `totalGap=${gap.j?.totalGap}`)
+
+  // 16 exchange-approve — a human, not the model, approves.
+  await req('POST', '/api/auth', { role: 'NATIONAL_ADMIN' }, { noAuth: true })
+  const xl = await req('GET', '/api/exchange')
+  const pend = (xl.j?.recommendations ?? []).find((x: any) => x.status === 'PENDING')
+  if (pend) {
+    const ex = await req('PATCH', '/api/exchange', { id: pend.id, action: 'approve', by: 'Walkthrough test' })
+    ok(ex.s === 200, '16 exchange-approve  a human approves the allocation', `status=${ex.s} ${ex.j?.error ?? ''}`)
+  } else {
+    ok(xl.s === 200, '16 exchange-approve  exchange list reachable (nothing PENDING left)', `${xl.j?.recommendations?.length ?? 0} recommendations`)
+  }
+
+  const demoAfter = await req('GET', `/api/bookings/${DBOOK}`)
+  ok(demoAfter.j?.booking?.refCode === DREF, 'walkthrough booking is queryable end-to-end', `${demoAfter.j?.booking?.refCode} ${demoAfter.j?.booking?.status}`)
 
   console.log(`\n${'='.repeat(60)}`)
   console.log(`  ${passed} passed, ${failed} failed`)

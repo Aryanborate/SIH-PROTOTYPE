@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/store/app-store'
 import { useDemoStore } from '@/store/demo-store'
-import { api } from '@/lib/api-client'
+import { api, signInAs } from '@/lib/api-client'
 import { t, LANG_LABEL } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { Logo, PrototypeNotice } from './shared/ui-kit'
@@ -253,7 +253,8 @@ export function LoginScreen() {
     setLoading(role)
     setError('')
     try {
-      const res = await api.get<{ ok: boolean; user: DemoUser }>(`/api/session?role=${role}`)
+      const res = await signInAs<{ ok: boolean; user: DemoUser }>(role)
+      if (!res.user) throw new Error(`No demo identity available for ${role}. Run: npm run db:seed`)
       login(res.user)
     } catch (e) {
       setError((e as Error).message)
@@ -262,21 +263,21 @@ export function LoginScreen() {
     }
   }
 
-  // SIH demo entry — reset + scripted login lives in the demo engine (15-b,
-  // exported from demo-launch.ts as startSihDemo). Lazy dynamic import keeps
-  // the landing renderable even if that module is momentarily absent.
+  // SIH demo entry — reset + scripted login lives in the demo engine
+  // (startSihDemo in demo-launch.ts).
   async function handleStartDemo() {
     try {
       const mod = await import('@/components/gigsetu/demo/demo-launch')
-      if (typeof mod.startSihDemo === 'function') {
-        await mod.startSihDemo()
-        return
-      }
-      throw new Error('startSihDemo export not found')
-    } catch {
+      if (typeof mod.startSihDemo !== 'function') throw new Error('startSihDemo export not found')
+      await mod.startSihDemo()
+    } catch (e) {
+      // Surface the REAL reason. The old copy always claimed the module was
+      // "still loading", which sent people hunting a phantom import bug while
+      // the actual failure was a 401/400 from the auth or reset call.
       toast({
-        title: 'SIH demo engine not ready',
-        description: 'The demo engine module is still loading — try again in a moment.',
+        title: 'Could not start the SIH demo',
+        description: (e as Error).message || 'Unknown error — check the browser console and the dev server log.',
+        variant: 'destructive',
       })
     }
   }

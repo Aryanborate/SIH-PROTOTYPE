@@ -19,6 +19,20 @@ export const api = {
   del: <T,>(url: string) => jsonFetch<T>(url, { method: 'DELETE' }),
 }
 
+/**
+ * Sign in as one of the seeded demo identities.
+ *
+ * IMPORTANT: this MUST be `POST /api/auth`. `GET /api/session?role=X` used to
+ * double as a login endpoint, but it was closed down as a privilege-escalation
+ * oracle — it now only answers "who am I right now?" and returns
+ * `{ user: null }` when logged out. Calling it to sign in silently handed a
+ * null identity to the store, which surfaced as the misleading
+ * "SIH demo engine not ready" toast. Always sign in through here.
+ */
+export async function signInAs<T>(role: string): Promise<T> {
+  return api.post<T>('/api/auth', { role })
+}
+
 export function inr(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—'
   return '₹' + n.toLocaleString('en-IN')

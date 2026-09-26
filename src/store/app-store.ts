@@ -64,7 +64,15 @@ export const useAppStore = create<AppState>()(
       focusIds: {},
       focusBookingRef: null,
       focusWorkerTab: null,
-      login: (u) => set({ user: u, view: defaultViewFor(u.role), focusIds: {}, focusBookingRef: null, focusWorkerTab: null }),
+      login: (u) => {
+        // Defensive: a null identity used to reach here and blow up on
+        // `u.role`, producing a cryptic TypeError that the UI then reported as
+        // "SIH demo engine not ready". Fail loudly and legibly instead.
+        if (!u || typeof u !== 'object' || !u.role) {
+          throw new Error('login() called without a valid identity. Sign in via POST /api/auth first.')
+        }
+        set({ user: u, view: defaultViewFor(u.role), focusIds: {}, focusBookingRef: null, focusWorkerTab: null })
+      },
       logout: () => set({ user: null, view: 'login', focusIds: {}, focusBookingRef: null, focusWorkerTab: null }),
       setLang: (l) => set({ lang: l }),
       setView: (v) => set({ view: v }),

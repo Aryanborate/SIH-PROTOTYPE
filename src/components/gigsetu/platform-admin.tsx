@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, fmtDateTime, inr, timeAgo } from '@/lib/api-client'
+import { api, fmtDateTime, inr, signInAs, timeAgo } from '@/lib/api-client'
 import { useAppStore, type View } from '@/store/app-store'
 import { t } from '@/lib/i18n'
 import { useToast } from '@/hooks/use-toast'
@@ -122,12 +122,10 @@ export function PlatformAdmin({ user }: { user: DemoUser }) {
 
   const sessionQ = useQuery({
     queryKey: ['platform-sessions'],
-    queryFn: () => Promise.all(
-      (['CUSTOMER', 'WORKER', 'COOP_ADMIN', 'TALUKA_COORD', 'DISTRICT_COORD', 'STATE_ADMIN', 'NATIONAL_ADMIN'] as const).map(async (r) => {
-        const res = await api.get<{ ok: boolean; user: { orgName?: string; name: string } }>(`/api/session?role=${r}`)
-        return { role: r, name: res.user.name, org: res.user.orgName ?? '—' }
-      })
-    ),
+    queryFn: () =>
+      api
+        .get<{ ok: boolean; identities: { role: string; name: string; orgName: string }[] }>('/api/auth/identities')
+        .then((r) => r.identities.map((i) => ({ role: i.role, name: i.name, org: i.orgName }))),
     staleTime: 30000,
   })
   const exchangeQ = useQuery({

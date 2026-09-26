@@ -59,16 +59,40 @@ geocoded to a named locality, not thrown away).
 ## Verification
 
 ```bash
-npm run verify     # typecheck + lint + production build
+npm run verify     # typecheck + lint + static audit + production build
 npm run db:seed    # re-seed (idempotent)
-node scripts/e2e-verify.ts   # 60-assertion end-to-end check of the §87 scenario
+npm run e2e        # 114-assertion end-to-end check (needs the dev server running)
+npm run audit      # static audit only: routes + UI wiring
 ```
 
 `scripts/e2e-verify.ts` exercises the full spec §87 path plus every security
 control: role escalation, price manipulation, rating without payment,
 notification ownership, privileged operations, the negotiation floor, the
-WhatsApp mass-assignment attempt, and all five GeoApify products. It needs the
-dev server running.
+WhatsApp mass-assignment attempt, and all five GeoApify products.
+
+It also contains two sections that exist because real bugs shipped past a green
+suite:
+
+* **§1b client sign-in contract** — every role button, the role switcher, the
+  platform console and the demo launcher sign in through `POST /api/auth`. They
+  once used `GET /api/session?role=X`, which was closed down as a
+  privilege-escalation oracle, so the UI silently received `{ user: null }` and
+  every button failed. These assertions fail loudly if that regresses.
+* **§14 the 16-step SIH demo walkthrough** — replays exactly the API sequence the
+  client-side demo engine performs when a judge clicks **START SIH DEMO**, so a
+  broken step is caught even though the engine itself is a React component.
+
+### Static audits
+
+| Command | Checks |
+| --- | --- |
+| `npm run audit:routes` | every `api.*()` call in the client resolves to a real route (no 404 buttons) |
+| `npm run audit:ui` | dead `<Button>`s, `async` handlers with no `catch`, and `t('key')` calls with no translation defined |
+| `npm run audit:handlers` | resolves `onClick={name}` references and verifies each `async` one catches |
+
+`audit:ui` and `audit:handlers` exist because the original failure mode was a
+silent one: an `async` `onClick` that rejected, swallowed by a generic toast that
+named the wrong culprit. Run them after adding UI.
 
 ---
 

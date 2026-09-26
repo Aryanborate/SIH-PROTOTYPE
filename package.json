@@ -19,7 +19,12 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
     "setup": "prisma generate && prisma db push --accept-data-loss && tsx prisma/seed.ts",
-    "verify": "npm run typecheck && npm run lint && npm run build"
+    "audit:routes": "tsx scripts/audit-routes.ts",
+    "audit:ui": "tsx scripts/audit-ui.ts",
+    "audit:handlers": "tsx scripts/audit-handlers.ts",
+    "audit": "npm run audit:routes && npm run audit:ui",
+    "e2e": "tsx scripts/e2e-verify.ts",
+    "verify": "npm run typecheck && npm run lint && npm run audit && npm run build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

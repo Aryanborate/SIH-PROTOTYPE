@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { api, signInAs } from '@/lib/api-client'
 import { areaDistance } from '@/lib/area-distance'
 import { useAppStore } from '@/store/app-store'
 import { useDemoStore, DEMO_STEP_COUNT } from '@/store/demo-store'
@@ -73,9 +73,10 @@ export function DemoEngine() {
   const ensureCustomer = useCallback(async (): Promise<string> => {
     const app = useAppStore.getState()
     if (app.user?.role === 'CUSTOMER' && app.user.customerId) return app.user.customerId
-    const res = await api.get<{ ok: boolean; user: DemoUser }>('/api/session?role=CUSTOMER')
+    const res = await signInAs<{ ok: boolean; user: DemoUser }>('CUSTOMER')
+    if (!res.user) throw new Error('Demo customer identity unavailable. Run: npm run db:seed')
     useAppStore.getState().login(res.user)
-    if (!res.user.customerId) throw new Error('Demo customer identity unavailable')
+    if (!res.user.customerId) throw new Error('Demo customer identity has no customerId')
     return res.user.customerId
   }, [])
 
@@ -416,7 +417,8 @@ export function DemoEngine() {
         // 13 — Cooperative dashboard updates (drill into the matched worker's coop)
         case 'coop-update': {
           const { coopId } = await ensureWorkerIdentity()
-          const res = await api.get<{ ok: boolean; user: DemoUser }>('/api/session?role=COOP_ADMIN')
+          const res = await signInAs<{ ok: boolean; user: DemoUser }>('COOP_ADMIN')
+          if (!res.user) throw new Error('COOP_ADMIN demo identity unavailable. Run: npm run db:seed')
           useAppStore.getState().login(res.user)
           useAppStore.getState().drillTo('coop', { coop: coopId })
           useDemoStore.getState().setNote('Opening the cooperative dashboard…')
@@ -436,7 +438,8 @@ export function DemoEngine() {
 
         // 14 — District demand increases
         case 'district-demand': {
-          const res = await api.get<{ ok: boolean; user: DemoUser }>('/api/session?role=DISTRICT_COORD')
+          const res = await signInAs<{ ok: boolean; user: DemoUser }>('DISTRICT_COORD')
+          if (!res.user) throw new Error('DISTRICT_COORD demo identity unavailable. Run: npm run db:seed')
           useAppStore.getState().login(res.user)
           useAppStore.getState().drillTo('district', {})
           const districtId = res.user.districtId
