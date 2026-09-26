@@ -1,0 +1,453 @@
+// GigSetu — Cooperative Workforce Operating System
+// Prisma schema (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Service taxonomy ----------
+
+model ServiceCategory {
+  id             String @id @default(cuid())
+  key            String @unique
+  nameEn         String
+  nameMr         String
+  nameHi         String
+  icon           String
+  baseRate       Int // visit base rate in Rs
+  avgDurationMin Int
+  descEn         String
+  descMr         String @default("")
+  descHi         String @default("")
+}
+
+// ---------- Cooperative hierarchy (configurable levels + org units) ----------
+
+model HierarchyLevelConfig {
+  id            String  @id @default(cuid())
+  level         Int
+  code          String
+  nameEn        String
+  nameMr        String
+  nameHi        String
+  descriptionEn String
+  active        Boolean @default(true)
+  orderIndex    Int
+}
+
+model Federation {
+  id                 String     @id @default(cuid())
+  type               String     @default("STATE") // STATE | NATIONAL
+  name               String
+  region             String // state name or "India"
+  chairperson        String
+  regNo              String
+  districts          Int
+  cooperatives       Int
+  workers            Int
+  activeWorkersPct   Float
+  jobsToday          Int
+  revenueMonthLakh   Float
+  welfareCoveragePct Float
+  demandJson         String // json: {skill: level}
+  skillGapJson       String // json: [{skill, gap, action}]
+  nationalJson       String? // json: national aggregate for type NATIONAL
+  districtsRel       District[]
+  createdAt          DateTime   @default(now())
+}
+
+model District {
+  id                  String     @id @default(cuid())
+  federationId        String
+  federation          Federation @relation(fields: [federationId], references: [id])
+  name                String
+  coordinator         String
+  zoneCount           Int
+  cooperatives        Int
+  workers             Int
+  activeWorkers       Int
+  jobsToday           Int
+  utilizationPct      Float
+  demandJson          String // json: {skill: "LOW"|"MEDIUM"|"HIGH"}
+  recommendationsJson String // json: string[] AI recommendations
+  comparisonJson      String // json: coop-wise per-skill availability vs expected jobs
+  mapPos              String // json: {x,y} schematic map position pct
+  talukas             Taluka[]
+  createdAt           DateTime   @default(now())
+}
+
+model Taluka {
+  id                String        @id @default(cuid())
+  districtId        String
+  district          District      @relation(fields: [districtId], references: [id])
+  name              String
+  coordinator       String
+  cooperatives      Int
+  workers           Int
+  availableWorkers  Int
+  emergencyCapacity Int
+  jobsToday         Int
+  utilizationPct    Float
+  demandJson        String // json: {skill: level}
+  zonesJson         String // json: [{zone, demand:{skill:level}, note}]
+  skillGapJson      String // json: [{skill, have, need}]
+  recommendation    String
+  cooperativesRel   Cooperative[]
+  createdAt         DateTime      @default(now())
+}
+
+model Cooperative {
+  id                String           @id @default(cuid())
+  talukaId          String
+  taluka            Taluka           @relation(fields: [talukaId], references: [id])
+  name              String
+  regNo             String
+  societyType       String
+  sector            String
+  repName           String
+  repRole           String
+  memberCount       Int
+  workerCount       Int
+  status            String           @default("OPERATIONAL")
+  verification      String           @default("VERIFIED")
+  activeToday       Int
+  jobsToday         Int
+  utilizationPct    Float
+  welfareFundRs     Int
+  emergencyPoolSize Int
+  earningsMonthRs   Int
+  featured          Boolean          @default(false)
+  pricingPolicyJson String
+  workers           Worker[]
+  registration      GovRegistration?
+  amcContracts      AmcContract[]
+  createdAt         DateTime         @default(now())
+}
+
+model GovRegistration {
+  id                       String      @id @default(cuid())
+  cooperativeId            String      @unique
+  cooperative              Cooperative @relation(fields: [cooperativeId], references: [id])
+  registrationNumber       String
+  registeredOn             String
+  registeringAuthority     String
+  state                    String
+  district                 String
+  taluka                   String
+  societyType              String
+  authorizedRepresentative String
+  memberCount              Int
+  workerCount              Int
+  serviceCategories        String // json list
+  operationalStatus        String
+  verificationStatus       String
+  sourceNote               String      @default("External / Authorized Integration")
+}
+
+// ---------- People ----------
+
+model Worker {
+  id               String      @id @default(cuid())
+  name             String
+  phone            String
+  cooperativeId    String
+  cooperative      Cooperative @relation(fields: [cooperativeId], references: [id])
+  primarySkill     String
+  secondarySkills  String // json string[]
+  experienceYears  Int
+  certName         String
+  certStatus       String // VERIFIED | PENDING | EXPIRING
+  certExpiry       String? // ISO date
+  languages        String // json string[]
+  serviceAreas     String // json string[]
+  baseArea         String
+  completedJobs    Int
+  rating           Float
+  completionRate   Float
+  safetyValid      Boolean     @default(true)
+  availability     String      @default("AVAILABLE") // AVAILABLE | BUSY | OFFLINE
+  emergencyPool    Boolean     @default(false)
+  activeJobsToday  Int         @default(0)
+  earningsMonthRs  Int         @default(0)
+  welfareBalanceRs Int         @default(0)
+  trainingsDone    Int         @default(0)
+  skillsJson       String // passport skill list json
+  welfareJson      String      @default("{}") // Phase 5 welfare wallet profile {insuranceStatus, insurancePolicy, insuranceRenewal, socialSecurityId, socialSecurityStatus, lastCheckup, benefits:[{name,status,detail}]}
+  bioEn            String
+  bookings         Booking[]
+  trustReports     TrustReport[]
+  createdAt        DateTime    @default(now())
+}
+
+model Customer {
+  id       String    @id @default(cuid())
+  name     String
+  phone    String
+  type     String    @default("HOUSEHOLD") // HOUSEHOLD | SOCIETY | SCHOOL | HOSPITAL | HOSTEL | BUSINESS | GOVT
+  address  String
+  area     String
+  city     String
+  lang     String    @default("en")
+  bookings Booking[]
+  places   SavedPlace[]
+  amcContracts      AmcContract[]
+  institutionRequests InstitutionRequest[]
+}
+
+// ---------- Customer saved places (address book) ----------
+
+model SavedPlace {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String // e.g. Home / Aai's home / Office
+  area       String
+  address    String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// ---------- Bookings ----------
+
+model Booking {
+  id             String    @id @default(cuid())
+  refCode        String    @unique
+  customerId     String
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  categoryKey    String
+  title          String
+  description    String
+  mediaJson      String    @default("[]")
+  area           String
+  address        String
+  scheduledAt    DateTime
+  urgency        String    @default("NORMAL") // NORMAL | URGENT | EMERGENCY
+  mode           String    @default("INSTANT") // INSTANT | QUOTE
+  status         String    @default("REQUESTED")
+  // QUOTE_REQUESTED | QUOTED | NEGOTIATING | REQUESTED | ACCEPTED | ON_THE_WAY | IN_PROGRESS | COMPLETED | PAID | REVIEWED | CANCELLED
+  analysisJson   String?
+  cooperativeId  String?
+  workerId       String?
+  worker         Worker?   @relation(fields: [workerId], references: [id])
+  estimatedPrice Int?
+  finalPrice     Int?
+  quoteJson      String    @default("[]")
+  quoteOffersJson String   @default("[]") // Phase 4: Request-a-Quote — 3 eligible worker offers [{workerId, workerName, coopName, price, availableAt, etaMin, rating}]
+  paymentJson    String?
+  evidenceJson   String?
+  rating         Int?
+  ratingJson     String? // Phase 5 two-sided trust: multi-factor rating {quality, timeliness, behaviour, communication}
+  review         String?
+  timelineJson   String    @default("[]")
+  autoAcceptAt   DateTime?
+  autoStageAt    DateTime?
+  lang           String    @default("en")
+  isDemoScript   Boolean   @default(false) // Phase 6: bookings created by the SIH demo engine — removable via RESET DEMO
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ---------- Cooperative Service Exchange ----------
+
+model ExchangeRecommendation {
+  id             String    @id @default(cuid())
+  skill          String
+  fromCoopId     String
+  fromCoopName   String
+  toCoopId       String
+  toCoopName     String
+  districtName   String
+  workerCount    Int
+  distanceKm     Float
+  expectedDemand Int
+  durationDays   Int
+  rationale      String
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedBy     String?
+  decidedAt      DateTime?
+  isDemoScript   Boolean   @default(false) // Phase 6: created by the SIH demo engine — removable via RESET DEMO
+  createdAt      DateTime  @default(now())
+}
+
+// Phase 6 #57 — Audit & Transparency: who changed what, when.
+model AuditLog {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  actor     String
+  actorRole String   @default("SYSTEM")
+  action    String   // WORKER_STATUS_CHANGE | EXCHANGE_APPROVED | EXCHANGE_REJECTED | PRICING_POLICY_UPDATED | ECONOMICS_UPDATED | AI_WEIGHTS_UPDATED | COMPLAINT_ACK | COMPLAINT_ESCALATED | COMPLAINT_RESOLVED | COMPLAINT_REOPENED | BOOKING_PAID | BOOKING_RATED | BOOKING_CANCELLED | TRAINING_ENROLLED | DEMO_RESET
+  entity    String
+  entityId  String   @default("-")
+  detail    String   @default("")
+}
+
+// ---------- Welfare / Training / Complaints / Notifications ----------
+
+model WelfareLedger {
+  id        String   @id @default(cuid())
+  workerId  String
+  type      String // CONTRIBUTION | BENEFIT
+  amount    Int
+  note      String
+  createdAt DateTime @default(now())
+}
+
+model Complaint {
+  id             String    @id @default(cuid())
+  cooperativeId  String
+  workerId       String?
+  bookingId      String? // links customer-reported complaints back to the booking (null for seeded walk-in records)
+  customerName   String
+  subject        String
+  detail         String
+  severity       String // LOW | MEDIUM | HIGH | SERIOUS
+  status         String    @default("OPEN") // OPEN | RESOLVING | RESOLVED | ESCALATED (Phase 6 dispute ladder)
+  resolutionNote String? // cooperative note recorded when the complaint is marked resolved
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+}
+
+model TrainingCourse {
+  id            String               @id @default(cuid())
+  title         String
+  categoryKey   String
+  provider      String
+  durationHrs   Int
+  mode          String // ONLINE | FIELD
+  certification String
+  seats         Int
+  enrollments   TrainingEnrollment[]
+}
+
+model TrainingEnrollment {
+  id        String         @id @default(cuid())
+  workerId  String
+  courseId  String
+  course    TrainingCourse @relation(fields: [courseId], references: [id])
+  progress  Int            @default(0)
+  status    String         @default("ENROLLED") // ENROLLED | IN_PROGRESS | COMPLETED
+  createdAt DateTime       @default(now())
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  audience   String // CUSTOMER | WORKER | COOP | TALUKA | DISTRICT | STATE
+  audienceId String
+  title      String
+  body       String
+  type       String   @default("INFO") // INFO | SUCCESS | WARNING | EMERGENCY
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// ---------- AI engine configuration (prototype) ----------
+
+// Configurable weights for the AI-assisted workforce matching engine.
+// Single-row config (id = "default") editable by admin; engine falls back to built-in defaults.
+model MatchWeightConfig {
+  id             String   @id @default("default")
+  skillMatch     Float    @default(35)
+  certification  Float    @default(15)
+  distance       Float    @default(15)
+  availability   Float    @default(15)
+  workload       Float    @default(10)
+  serviceHistory Float    @default(10)
+  updatedBy      String   @default("system")
+  updatedAt      DateTime @updatedAt
+}
+
+model IntegrationRegistry {
+  id       String @id @default(cuid())
+  name     String
+  domain   String
+  purpose  String
+  status   String @default("FUTURE") // FUTURE | DESIGNED
+  dataFlow String
+}
+
+// ===================== Phase 5 =====================
+
+// ---------- Institutional portal: AMC / maintenance contracts ----------
+
+model AmcContract {
+  id               String   @id @default(cuid())
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id])
+  cooperativeId    String
+  cooperative      Cooperative @relation(fields: [cooperativeId], references: [id])
+  title            String
+  propertyType     String // SOCIETY | SCHOOL | HOSPITAL | HOSTEL | BUSINESS | GOVT
+  units            Int // flats / rooms / beds covered
+  servicesJson     String // json string[] — plumbing, electrical, cleaning, gardening, preventive, emergency
+  status           String   @default("ACTIVE") // ACTIVE | PENDING | EXPIRING | EXPIRED
+  startDate        String // ISO
+  endDate          String // ISO
+  monthlyFeeRs     Int
+  slaHours         Int // emergency response SLA in hours
+  slaMetPct        Float    @default(95)
+  monthlyRequests  Int      @default(0)
+  completedJobs    Int      @default(0)
+  pendingJobs      Int      @default(0)
+  workersJson      String   @default("[]") // json allocated workers [{id,name,skill,role}]
+  createdAt        DateTime @default(now())
+}
+
+// ---------- Institutional portal: bulk / recurring service requests ----------
+
+model InstitutionRequest {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  contractId   String? // optional link to an AMC contract
+  type         String // BULK | RECURRING | MAINTENANCE | EMERGENCY
+  categoryKey  String
+  title        String
+  detail       String   @default("")
+  area         String
+  headcount    Int      @default(1) // workers requested (bulk jobs)
+  scheduleJson String   @default("{}") // json {freq: WEEKLY|MONTHLY|DAILY, day, slot}
+  scheduledAt  DateTime
+  status       String   @default("REQUESTED") // REQUESTED | SCHEDULED | IN_PROGRESS | COMPLETED | CANCELLED
+  estimatedRs  Int?
+  createdAt    DateTime @default(now())
+}
+
+// ---------- Two-sided trust: worker-side reports (customer ratings live on Booking) ----------
+
+model TrustReport {
+  id             String   @id @default(cuid())
+  bookingId      String? // linked job when reported against a specific booking
+  workerId       String
+  worker         Worker   @relation(fields: [workerId], references: [id])
+  category       String // UNSAFE_ENV | ABUSIVE_BEHAVIOUR | REPEAT_CANCELLATION | PAYMENT_ISSUE
+  detail         String
+  status         String   @default("OPEN") // OPEN | REVIEWING | RESOLVED
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+}
+
+// ---------- Configurable fee model (#38) + cooperative economics (#40) ----------
+
+model FeeConfig {
+  id             String   @id @default("default")
+  workerSharePct Float    @default(86) // worker keeps this share of every payment
+  coopPct        Float    @default(8)  // cooperative commission
+  welfarePct     Float    @default(2)  // worker welfare fund
+  platformPct    Float    @default(4)  // platform / technology fee
+  updatedBy      String   @default("system")
+  updatedAt      DateTime @updatedAt
+}
+
+model EconomicsConfig {
+  id            String   @id @default("default")
+  revenueJson   String // json [{key, label, priceRs, unit, active, note}] — configurable revenue sources
+  note          String   @default("Prototype economics — pricing under cooperative review, not final")
+  updatedBy     String   @default("system")
+  updatedAt     DateTime @updatedAt
+}
