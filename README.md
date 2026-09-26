@@ -23,12 +23,77 @@ foreign-key order and rebuilds the whole demo dataset.
 
 ### Environment variables
 
-Everything is documented in **`.env.example`**. Only two are required:
+Everything is documented in **`.env.example`**.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | yes | `file:../db/custom.db` (relative to `prisma/`, so it works on any machine) |
+| `DATABASE_URL` | yes | `file:../db/custom.db` locally, or `libsql://…` on serverless (see below) |
 | `AUTH_SECRET` | yes | HMAC key for the signed session cookie. Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+| `DATABASE_AUTH_TOKEN` | serverless only | Turso/libSQL auth token |
+| `GEOAPIFY_*_KEY` | no | Five optional map products; offline fallback otherwise |
+
+Check any environment at runtime with **`GET /api/health`** — it reports which
+variables are present (never their values) and returns `503` with a fix if the
+database is unreachable. The UI shows a banner for the same condition.
+
+---
+
+## Deploying to Vercel
+
+> **Read this before deploying.** A `file:` SQLite database **cannot** run on
+> Vercel. Serverless instances have a read-only filesystem that is not shared
+> between them, so the file is neither writable nor present. Every API route
+> will fail. The app detects this and says so, but you still need a real
+> database.
+
+The schema and every query are plain SQLite, so a **libSQL / Turso** database
+works with no code and no query changes — only the transport is different
+(handled automatically by `src/lib/db.ts`).
+
+**1. Create a free database**
+
+```bash
+npm install -g @libsql/cli
+turso db create gigsetu          # note the URL it prints
+turso db tokens create           # note the token
+```
+
+**2. Push the schema and seed it, once, from your machine**
+
+```bash
+DATABASE_URL="libsql://your-db.turso.io" DATABASE_AUTH_TOKEN="your-token" npx prisma db push
+DATABASE_URL="libsql://your-db.turso.io" DATABASE_AUTH_TOKEN="your-token" npm run db:seed
+```
+
+**3. Add environment variables in Vercel**
+
+Project → **Settings → Environment Variables** (add to *all* environments, then
+redeploy — changing env vars does not rebuild an existing deployment):
+
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | `libsql://your-db.turso.io` |
+| `DATABASE_AUTH_TOKEN` | your Turso token |
+| `AUTH_SECRET` | a 96-char random hex string |
+| `GEOAPIFY_*_KEY` | *(optional — the demo falls back to the built-in grid)* |
+
+**4. Verify the deployment**
+
+```bash
+curl -i https://your-app.vercel.app/api/health
+```
+
+`200` with `"status":"healthy"` means it is wired up. A `503` response names the
+exact variable to set.
+
+> `.env` is gitignored on purpose, so it is **not** deployed. That is why a
+> fresh Vercel deploy has no `DATABASE_URL` until you add it above. Never commit
+> real keys.
+
+### Other hosts
+
+Anything with a writable, persistent filesystem (a VPS, Railway with a volume,
+Docker) works with the plain `file:../db/custom.db` — no adapter involved.
 
 ### Optional: GeoApify (spec §42)
 

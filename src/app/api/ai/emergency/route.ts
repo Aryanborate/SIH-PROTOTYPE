@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { serverError } from '@/lib/http'
 import { escalateEmergency } from '@/lib/emergency'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(await escalateEmergency(categoryKey, area))
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 })
+    return serverError(e)
   }
 }

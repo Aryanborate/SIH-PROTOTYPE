@@ -25,6 +25,7 @@
     "audit": "npm run audit:routes && npm run audit:ui",
     "e2e": "tsx scripts/e2e-verify.ts",
     "verify:theme": "tsx scripts/verify-theme.ts",
+    "verify:deploy": "tsx scripts/verify-deploy.ts",
     "verify": "npm run typecheck && npm run lint && npm run audit && npm run build"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.1.1",
+    "@prisma/adapter-libsql": "^6.19.3",
     "@prisma/client": "^6.11.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",

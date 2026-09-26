@@ -41,6 +41,22 @@ function key(name: string): string | null {
   return v && v.trim().length >= 16 ? v.trim() : null
 }
 
+/**
+ * True when at least one GeoApify product has a usable key. Reported by
+ * /api/health so a deployment can be checked without exposing any key value.
+ * Never fatal: every geo call falls back to the built-in Pune grid.
+ */
+export function isGeoApifyConfigured(): boolean {
+  if (!enabled()) return false
+  return [
+    'GEOAPIFY_AUTOCOMPIFY_KEY',
+    'GEOAPIFY_GEOCODING_KEY',
+    'GEOAPIFY_REVERSE_GEOCODING_KEY',
+    'GEOAPIFY_ROUTE_MATRIX_KEY',
+    'GEOAPIFY_ROUTING_KEY',
+  ].some((n) => Boolean(key(n)))
+}
+
 export interface LatLon {
   lat: number
   lon: number

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { serverError } from '@/lib/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -163,6 +164,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, q, groups })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 })
+    return serverError(e)
   }
 }

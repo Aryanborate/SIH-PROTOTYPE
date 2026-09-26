@@ -9,12 +9,37 @@
 import { NextResponse } from 'next/server'
 import { ZodError, type ZodType } from 'zod'
 import { getSession, roleAtLeast, type SessionUser } from './session'
+import { DatabaseConfigurationError } from './db'
 import type { Role } from './types'
 export { safeJson, safeArray, safeObject, clampNumber, safeDate, safeIso, safeStr } from './safe'
 import { safeStr } from './safe'
 
 /** Never leak Prisma/SQLite internals to the browser. */
 const SAFE_ERROR = 'Something went wrong handling that request.'
+
+/**
+ * A misconfigured database is an operator problem, not a client problem, so it
+ * gets a 503 plus the exact remedy. Without this, every route returned an
+ * opaque "Something went wrong" (or, worse, leaked the raw Prisma message) and
+ * a Vercel deploy with no env vars looked identical to an application bug.
+ */
+function serviceUnavailable(err: DatabaseConfigurationError) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: err.message,
+      hint: err.hint,
+      code: 'DATABASE_NOT_CONFIGURED',
+    },
+    { status: 503 }
+  )
+}
+
+/** Prisma throws a plain Error for a missing/blank datasource URL. Detect it. */
+function looksLikeMissingDatasource(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e ?? '')
+  return /You must provide a nonempty URL|Environment variable not found: DATABASE_URL|datasource.*db.*url/i.test(msg)
+}
 
 export function ok<T extends object>(data: T, status = 200) {
   return NextResponse.json({ ok: true, ...data }, { status })
@@ -44,6 +69,17 @@ export function notFound(error = 'Not found.') {
 export function serverError(e?: unknown) {
   if (e instanceof ZodError) {
     return badRequest('Some fields need attention.', { fields: e.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
+  }
+  if (e instanceof DatabaseConfigurationError) return serviceUnavailable(e)
+  if (looksLikeMissingDatasource(e)) {
+    return serviceUnavailable(
+      new DatabaseConfigurationError(
+        'The database is not configured on this deployment.',
+        process.env.VERCEL
+          ? 'Set DATABASE_URL to a libsql:// URL and DATABASE_AUTH_TOKEN to your Turso token in Vercel → Settings → Environment Variables.'
+          : 'Copy .env.example to .env and set DATABASE_URL, then run `npm run setup`.'
+      )
+    )
   }
   // Business-rule failures carry their own HTTP status (409/400/404) instead of
   // collapsing into a blanket 500.

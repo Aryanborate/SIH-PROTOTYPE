@@ -6,6 +6,7 @@ import { MotionConfig } from 'framer-motion'
 import { useAppStore } from '@/store/app-store'
 import { LoginScreen } from './login-screen'
 import { AppShell } from './app-shell'
+import { DeploymentBanner } from '@/components/deployment-banner'
 
 function useHydrated() {
   return useSyncExternalStore(
@@ -39,6 +40,7 @@ export function GigSetuApp() {
           A second, nested provider here would hold a different resolvedTheme
           than the one the document class was set from. */}
       <MotionConfig reducedMotion="user">
+        <DeploymentBanner />
         {user ? <AppShell /> : <LoginScreen />}
       </MotionConfig>
     </QueryClientProvider>

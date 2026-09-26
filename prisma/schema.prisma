@@ -3,6 +3,9 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Lets DATABASE_URL point at a serverless libSQL/Turso database on Vercel
+  // while the same schema keeps working against a local SQLite file.
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

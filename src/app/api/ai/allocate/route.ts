@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { serverError } from '@/lib/http'
 import { allocateWorker } from '@/lib/matching'
 import type { Urgency } from '@/lib/types'
 
@@ -21,6 +22,6 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json(result)
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 })
+    return serverError(e)
   }
 }
