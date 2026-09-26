@@ -67,3 +67,12 @@ worklog.md
 pm run setup (idempotent seed)
 db/*.db
 db/*.db-journal
+
+# stray SQLite files from local turso/libsql CLI experiments
+auth
+auth-wal
+login
+login-wal
+*.db-wal
+*.db-shm
+*.db-journal

@@ -18,6 +18,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:seed": "tsx prisma/seed.ts",
+    "db:push-remote": "tsx scripts/setup-remote-db.ts",
     "setup": "prisma generate && prisma db push --accept-data-loss && tsx prisma/seed.ts",
     "audit:routes": "tsx scripts/audit-routes.ts",
     "audit:ui": "tsx scripts/audit-ui.ts",

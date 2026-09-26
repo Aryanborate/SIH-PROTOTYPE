@@ -50,20 +50,28 @@ The schema and every query are plain SQLite, so a **libSQL / Turso** database
 works with no code and no query changes — only the transport is different
 (handled automatically by `src/lib/db.ts`).
 
-**1. Create a free database**
+**1. Create a free database in the browser (~2 min)**
 
-```bash
-npm install -g @libsql/cli
-turso db create gigsetu          # note the URL it prints
-turso db tokens create           # note the token
-```
+Go to **https://app.turso.co** → sign in with GitHub:
+
+1. **Create database** → copy the `libsql://…` URL it shows
+2. **Settings → API Tokens → Create Token** → copy the token (shown once)
+
+> The Turso CLI is deliberately *not* part of this flow. As of `turso-cli`
+> v1.0.32 the published binaries are macOS/Linux only — there is no Windows
+> build, and the docs tell Windows users to install WSL first. The
+> `turso_cli-installer.ps1` in the `tursodatabase/turso` repo installs
+> `tursodb.exe`, which is the *embedded* database and has no `db create`
+> subcommand at all. The dashboard avoids all of that.
 
 **2. Push the schema and seed it, once, from your machine**
 
 ```bash
-DATABASE_URL="libsql://your-db.turso.io" DATABASE_AUTH_TOKEN="your-token" npx prisma db push
-DATABASE_URL="libsql://your-db.turso.io" DATABASE_AUTH_TOKEN="your-token" npm run db:seed
+npm run db:push-remote      # pastes the URL + token, then pushes, seeds and verifies
 ```
+
+It validates the URL, checks the connection, runs `prisma db push`, seeds the
+full demo dataset, re-verifies, then prints the exact Vercel variables.
 
 **3. Add environment variables in Vercel**
 
