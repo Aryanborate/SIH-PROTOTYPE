@@ -1,10 +1,37 @@
 /**
  * GigSetu seed — realistic synthetic Maharashtra cooperative ecosystem.
- * Run: bun prisma/seed.ts
+ * Run: npx tsx prisma/seed.ts
+ *
+ * The client is chosen by the DATABASE_URL scheme, exactly like the app:
+ *   file:              -> plain PrismaClient (local dev)
+ *   libsql:// https:// -> @prisma/adapter-libsql (Turso / serverless)
+ * A bare `new PrismaClient()` here only worked for `file:` and failed with
+ * P1012 "the URL must start with the protocol `file:`" when seeding a remote
+ * database for a Vercel deploy.
  */
 import { PrismaClient } from '@prisma/client'
+import type { PrismaLibSQL } from '@prisma/adapter-libsql'
 
-const db = new PrismaClient()
+const url = process.env.DATABASE_URL?.trim() ?? ''
+
+function createClient(): PrismaClient {
+  const isRemote = /^libsql:\/\//.test(url) || /^https:\/\//.test(url)
+  if (!isRemote) return new PrismaClient()
+  const token = process.env.DATABASE_AUTH_TOKEN?.trim()
+  if (!token) {
+    throw new Error(
+      'DATABASE_URL points at a remote libSQL database but DATABASE_AUTH_TOKEN is not set. ' +
+        'Run `npm run db:push-remote`, which sets both for you.'
+    )
+  }
+  // Required lazily so a `file:` setup never loads the adapter.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('@prisma/adapter-libsql') as { PrismaLibSQL: typeof PrismaLibSQL }
+  const adapter = new mod.PrismaLibSQL({ url, authToken: token })
+  return new PrismaClient({ adapter })
+}
+
+const db = createClient()
 
 // deterministic PRNG for stable synthetic data
 let _s = 42

@@ -70,8 +70,22 @@ Go to **https://app.turso.co** → sign in with GitHub:
 npm run db:push-remote      # pastes the URL + token, then pushes, seeds and verifies
 ```
 
-It validates the URL, checks the connection, runs `prisma db push`, seeds the
-full demo dataset, re-verifies, then prints the exact Vercel variables.
+It validates the URL, tests connectivity, creates the schema, seeds the full
+demo dataset, then re-verifies and prints the exact Vercel variables.
+
+> **`prisma db push` cannot target a `libsql://` URL.** The Prisma CLI only
+> accepts `file:` for the sqlite provider and rejects the URL during config
+> validation (P1012) — the driver adapter that makes libSQL work is a *runtime*
+> concern the CLI does not know about. So the schema is created by generating the
+> DDL locally and executing it over the wire:
+>
+> ```bash
+> npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+> # → 25 CREATE TABLE + 3 CREATE UNIQUE INDEX, applied via @prisma/adapter-libsql
+> ```
+>
+> `prisma/seed.ts` selects its client the same way the app does, so the identical
+> seed runs against a local file or a remote libSQL database.
 
 **3. Add environment variables in Vercel**
 

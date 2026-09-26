@@ -27,6 +27,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 
 const IS_WINDOWS = process.platform === 'win32'
@@ -39,8 +40,12 @@ const IS_WINDOWS = process.platform === 'win32'
  */
 const NPX = IS_WINDOWS ? 'npx.cmd' : 'npx'
 
-function run(cmd: string, args: string[], env: Record<string, string>): { code: number; out: string } {
-  const r = spawnSync(cmd, args, {
+/** A fresh HMAC key for the session cookie, so the block is pure copy-paste. */
+function randomSecret(): string {
+  return randomBytes(48).toString('hex')
+}
+
+function run(cmd: string, args: string[], env: Record<string, string>): { code: number; out: string } {  const r = spawnSync(cmd, args, {
     encoding: 'utf8',
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -101,31 +106,42 @@ If you do not have one yet, create it at https://app.turso.co
   const env: Record<string, string> = { DATABASE_URL: url, DATABASE_AUTH_TOKEN: token }
 
   h('Checking the connection')
-  const pre = run(NPX, ['tsx', 'scripts/verify-remote-db.ts'], env)
+  // Connectivity ONLY at this point. A brand-new database has no tables yet, so
+  // demanding a seeded dataset here would fail on exactly the database that
+  // most needs initialising.
+  const pre = run(NPX, ['tsx', 'scripts/verify-remote-db.ts', '--connect'], env)
   for (const line of pre.out.split('\n').filter(Boolean)) console.log(`    ${line}`)
-  // Fail CLOSED. An empty result means the check never really ran (a spawn
-  // failure looks exactly like success if you only test for the absence of an
-  // error string), so refuse to continue rather than push a schema blind.
+  // Fail CLOSED. Empty output means the check never ran (a spawn failure looks
+  // identical to success if you only test for the absence of an error string).
   if (!pre.out.trim()) {
-    bad('the connection check produced no output — it did not actually run.')
-    console.log(`    exit=${pre.code}  command: ${NPX} tsx scripts/verify-remote-db.ts`)
+    bad('the connection check produced no output - it did not actually run.')
+    console.log(`    exit=${pre.code}  command: ${NPX} tsx scripts/verify-remote-db.ts --connect`)
     process.exit(1)
   }
   if (/REMOTE DB FAIL/.test(pre.out)) {
-    bad('cannot reach the database yet — fix the above before continuing.')
-    console.log('    404 -> the database URL does not exist.   401/403 -> the token is wrong.')
+    bad('cannot reach the database - fix the above before continuing.')
     process.exit(1)
   }
-  ok('reachable')
+  if (!/REMOTE DB CONNECTED/.test(pre.out)) {
+    bad('the connection check did not report success.')
+    process.exit(1)
+  }
+  ok('reachable and authenticated')
 
   h('Pushing the schema')
-  const push = run(NPX, ['prisma', 'db', 'push', '--skip-generate'], env)
-  if (push.code !== 0 || !push.out.trim()) {
-    bad('prisma db push failed:')
-    console.log(push.out || `(no output, exit=${push.code})`)
+  // `prisma db push` cannot target a libsql:// URL — the CLI rejects it during
+  // config validation (P1012) because the driver adapter is a runtime-only
+  // concern. So generate the DDL locally and execute it over the wire instead.
+  const push = run(NPX, ['tsx', 'scripts/push-schema-remote.ts'], env)
+  for (const line of push.out.split('\n').filter(Boolean)) {
+    // The applier is verbose about each table; keep the summary lines only.
+    if (/^\s{2}\+ /.test(line)) continue
+    console.log(`    ${line}`)
+  }
+  if (push.code !== 0 || !/SCHEMA PUSH OK/.test(push.out)) {
+    bad('schema push failed (see above).')
     process.exit(1)
   }
-  ok('schema created')
 
   h('Seeding the demo dataset')
   const seed = run(NPX, ['tsx', 'prisma/seed.ts'], env)
@@ -139,24 +155,27 @@ If you do not have one yet, create it at https://app.turso.co
   h('Verifying')
   const probe = run(NPX, ['tsx', 'scripts/verify-remote-db.ts'], env)
   for (const line of probe.out.split('\n').filter(Boolean)) console.log(`    ${line}`)
-  if (!/REMOTE DB OK/.test(probe.out)) process.exit(1)
+  if (!/REMOTE DB OK/.test(probe.out)) {
+    bad('the database is reachable but not correctly seeded - see above.')
+    process.exit(1)
+  }
 
   console.log(`
-  \x1b[1;32m===========================================================\x1b[0m
-  \x1b[1m  Paste into Vercel -> Settings -> Environment Variables\x1b[0m
-  \x1b[1;32m===========================================================\x1b[0m
+\x1b[1;32m===========================================================\x1b[0m
+\x1b[1m  Paste into Vercel -> Settings -> Environment Variables\x1b[0m
+\x1b[1;32m===========================================================\x1b[0m
 
-  Type = \x1b[1mSecret\x1b[0m for each. Enable Production + Preview + Development.
-  Paste the value only — no quotes, no trailing spaces.
+Type = \x1b[1mSecret\x1b[0m for each. Enable Production + Preview + Development.
+Paste the value only — no quotes, no trailing spaces.
 
-    DATABASE_URL
-  ${url}
+  DATABASE_URL
+${url}
 
-    DATABASE_AUTH_TOKEN
-  ${token}
+  DATABASE_AUTH_TOKEN
+${token}
 
   AUTH_SECRET
-  (generate:  node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
+${randomSecret()}
 
 Then \x1b[1mREDEPLOY\x1b[0m — adding environment variables does not rebuild the app.
 

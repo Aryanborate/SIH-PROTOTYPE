@@ -42,10 +42,17 @@ export interface PricingContext {
   materialRs?: number
 }
 
-/** Fallback policy when no cooperative row is available. Mirrors POLICY_DEFAULTS. */
+/**
+ * Fallback policy when no cooperative row is available.
+ *
+ * These MUST stay identical to POLICY_DEFAULTS in matching.ts — that object is
+ * the source of truth. They drifted apart (0.9/0.25 here vs 0.92/0.17 there),
+ * which meant the fair-price floor and quote cap silently changed depending on
+ * whether the cooperative's policy row happened to be readable.
+ */
 export const COOP_POLICY = {
-  negotiationFloorPct: 0.9, // no deal below 90% of estimate — protects worker income
-  maxQuoteUpliftPct: 0.25, // worker quotes can exceed estimate by at most 25%
+  negotiationFloorPct: 0.92, // no deal below 92% of estimate — protects worker income
+  maxQuoteUpliftPct: 0.17, // worker quotes can exceed estimate by at most 17%
   welfareContributionPct: 0.02,
   coopCommissionPct: 0.08,
   platformFeePct: 0.04,
