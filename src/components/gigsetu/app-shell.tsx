@@ -23,7 +23,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/theme-provider'
 import { useToast } from '@/hooks/use-toast'
 import type { DemoUser, Lang, NotificationDTO, Role } from '@/lib/types'
 import {

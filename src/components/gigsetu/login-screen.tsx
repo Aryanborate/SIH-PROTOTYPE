@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/theme-provider'
 import { useToast } from '@/hooks/use-toast'
 import type { DemoUser, Lang, Role } from '@/lib/types'
 import {

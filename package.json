@@ -24,6 +24,7 @@
     "audit:handlers": "tsx scripts/audit-handlers.ts",
     "audit": "npm run audit:routes && npm run audit:ui",
     "e2e": "tsx scripts/e2e-verify.ts",
+    "verify:theme": "tsx scripts/verify-theme.ts",
     "verify": "npm run typecheck && npm run lint && npm run audit && npm run build"
   },
   "dependencies": {
@@ -70,7 +71,6 @@
     "lucide-react": "^0.525.0",
     "next": "^16.1.1",
     "next-intl": "^4.3.4",
-    "next-themes": "^0.4.6",
     "react": "^19.0.0",
     "react-day-picker": "^9.8.0",
     "react-dom": "^19.0.0",

@@ -2,7 +2,6 @@
 
 import { useState, useSyncExternalStore } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ThemeProvider } from 'next-themes'
 import { MotionConfig } from 'framer-motion'
 import { useAppStore } from '@/store/app-store'
 import { LoginScreen } from './login-screen'
@@ -36,11 +35,12 @@ export function GigSetuApp() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-        <MotionConfig reducedMotion="user">
-          {user ? <AppShell /> : <LoginScreen />}
-        </MotionConfig>
-      </ThemeProvider>
+      {/* ThemeProvider lives in app/layout.tsx so it also wraps the Toaster.
+          A second, nested provider here would hold a different resolvedTheme
+          than the one the document class was set from. */}
+      <MotionConfig reducedMotion="user">
+        {user ? <AppShell /> : <LoginScreen />}
+      </MotionConfig>
     </QueryClientProvider>
   )
 }
