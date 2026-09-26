@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, inr } from '@/lib/api-client'
 import { useAppStore } from '@/store/app-store'
 import { t } from '@/lib/i18n'
-import { DEMO_AREAS, type MatchResponse, type SavedPlaceDTO, type ServiceCategoryDTO } from '@/lib/types'
+import { DEMO_AREAS, type MatchResponse, type PlaceSuggestion, type SavedPlaceDTO, type ServiceCategoryDTO } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { SectionCard, StatusChip } from '../shared/ui-kit'
 import { Button } from '@/components/ui/button'
@@ -92,7 +92,10 @@ export function BookingFlow({
   const [addrOpen, setAddrOpen] = useState(false)
   const addrQ = useQuery({
     queryKey: ['geo-autocomplete', addrQuery],
-    queryFn: () => api.get<{ ok: boolean; source: string; results: Array<{ id: string; label: string; area: string; lat: number; lon: number }> }>(`/api/geo/autocomplete?q=${encodeURIComponent(addrQuery)}`),
+    // Import the server's real type rather than re-declaring it. A hand-written
+    // `area: string` here previously asserted a field the server never sent, so
+    // TypeScript happily compiled a bug that blanked the service area.
+    queryFn: () => api.get<{ ok: boolean; source: string; results: PlaceSuggestion[] }>(`/api/geo/autocomplete?q=${encodeURIComponent(addrQuery)}`),
     enabled: addrQuery.trim().length >= 3,
     staleTime: 300000,
   })
@@ -255,6 +258,21 @@ export function BookingFlow({
   }
 
   async function runMatch() {
+    // Guard before firing. The server requires both fields and answers 400 with
+    // "categoryKey and area required", which is a dead end for the user — they
+    // cannot tell which field is missing or how to fix it. The area in
+    // particular can be blanked by clearing the Location step, so send them
+    // back there rather than surfacing a raw API error.
+    if (!categoryKey?.trim()) {
+      toast({ title: 'Choose a service first', description: 'Pick the service you need before finding workers.', variant: 'destructive' })
+      setStep(0)
+      return
+    }
+    if (!flowArea?.trim()) {
+      toast({ title: 'Choose your area', description: 'Matching needs a service area so it can find a verified worker near you.', variant: 'destructive' })
+      setStep(3)
+      return
+    }
     setMatching(true)
     try {
       const res = await api.post<MatchResponse>('/api/match', {
@@ -491,8 +509,14 @@ export function BookingFlow({
                           type="button"
                           className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
                           onClick={() => {
-                            setFlowArea(s.area)
+                            // Never let a suggestion blank the area: the server
+                            // now always sends one, but if it ever regressed a
+                            // missing `area` would silently wipe the selection
+                            // and break the Match step.
+                            const resolved = s.area?.trim()
+                            if (resolved) setFlowArea(resolved)
                             setAddrQuery(s.label)
+                            setAddress(s.label)
                             setAddrOpen(false)
                           }}
                         >

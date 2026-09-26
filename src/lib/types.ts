@@ -688,3 +688,28 @@ export interface WorkerVerificationDTO {
   earnedPct: number
   note: string
 }
+
+/**
+ * One address-autocomplete suggestion (spec §42).
+ *
+ * Lives here, in the shared types module, because BOTH the GeoApify route and
+ * the booking flow consume it. It previously lived in lib/geoapify.ts while the
+ * client re-declared its own copy asserting `area: string` — a field the server
+ * never actually sent. The result: picking an address set the service area to
+ * `undefined`, and the next POST /api/match failed with
+ * "categoryKey and area required". Sharing one definition makes that class of
+ * drift impossible.
+ */
+export interface PlaceSuggestion {
+  id: string
+  label: string
+  lat: number
+  lon: number
+  type: string
+  /** Resolved service area (e.g. "Kothrud"). REQUIRED, never undefined. */
+  area: string
+  city?: string
+  stateDistrict?: string
+  suburb?: string
+  postcode?: string
+}

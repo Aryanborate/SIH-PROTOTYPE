@@ -85,17 +85,13 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown | nul
 
 // ---------------------------------------------------------------- autocomplete
 
-export interface PlaceSuggestion {
-  id: string
-  label: string
-  lat: number
-  lon: number
-  type: string
-  city?: string
-  stateDistrict?: string
-  suburb?: string
-  postcode?: string
-}
+/**
+ * Address-autocomplete suggestion. Declared in the shared types module so the
+ * booking flow and this route cannot drift apart — see PlaceSuggestion there
+ * for why `area` is mandatory.
+ */
+export type { PlaceSuggestion } from './types'
+import type { PlaceSuggestion } from './types'
 
 interface GeoResult {
   place_id?: string
@@ -118,6 +114,7 @@ function toSuggestion(r: GeoResult, i: number): PlaceSuggestion | null {
     lat: r.lat,
     lon: r.lon,
     type: r.result_type ?? 'place',
+    area: pickArea(r),
     city: r.city,
     stateDistrict: r.state_district,
     suburb: r.suburb,
@@ -142,19 +139,33 @@ export async function autocomplete(text: string, limit = 6): Promise<{ source: G
 function localSuggestions(q: string, limit: number): PlaceSuggestion[] {
   if (!q) return []
   const needle = q.toLowerCase()
-  return Object.entries(AREA_COORDS)
-    .filter(([name]) => name.toLowerCase().includes(needle))
-    .slice(0, limit)
-    .map(([name, p]) => ({
+  const names = Object.keys(AREA_COORDS)
+
+  const toSuggestion = (name: string): PlaceSuggestion => {
+    const p = AREA_COORDS[name]
+    return {
       id: `local:${name}`,
       label: `${name}, Pune, Maharashtra`,
       lat: gridToLat(p.y),
       lon: gridToLon(p.x),
       type: 'locality',
+      // Required by the booking flow; this is the grid key, so it is already a
+      // value the matching engine understands.
+      area: name,
       city: 'Pune',
       stateDistrict: 'Pune District',
       suburb: name,
-    }))
+    }
+  }
+
+  // A city- or state-level query ("pune", "maharashtra") matches no locality
+  // name, so the naive filter below returned an EMPTY dropdown — the first thing
+  // a real user types. Fall back to the whole grid in that case.
+  const regionLevel = /pune|maharashtra|pmc|pcmc/.test(needle)
+  const hits = names.filter((name) => name.toLowerCase().includes(needle))
+  const chosen = hits.length > 0 ? hits : regionLevel ? names : []
+
+  return chosen.slice(0, limit).map(toSuggestion)
 }
 
 // ---------------------------------------------------------------- geocoding

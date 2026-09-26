@@ -65,6 +65,39 @@ async function main() {
   r = await req('POST', '/api/auth', { role: 'SUPERADMIN' }, { noAuth: true })
   ok(r.s === 400, 'an unknown role is rejected', r.j?.error)
 
+  // ---------- 1c. GEO SUGGESTION CONTRACT (regression) ----------
+  // Regression guard. The booking flow does `setFlowArea(suggestion.area)` when
+  // the customer picks an address, then POSTs /api/match with it. `area` was
+  // declared in the client's hand-written response type but never actually sent
+  // by the server, so picking any address blanked the service area and the Match
+  // step failed with "categoryKey and area required". It only surfaced on
+  // Vercel, where the GeoApify keys are absent and the offline fallback serves
+  // the suggestions. Every suggestion from EVERY source must carry an area.
+  section('1c address suggestions always resolve an area (regression: blank area -> match 400)')
+  for (const q of ['Koth', 'Karve', 'Pune']) {
+    const g = await req('GET', `/api/geo/autocomplete?q=${encodeURIComponent(q)}`)
+    const results = g.j?.results ?? []
+    const missing = results.filter((x: any) => typeof x.area !== 'string' || !x.area.trim()).length
+    ok(
+      results.length > 0 && missing === 0,
+      `autocomplete("${q}") returns usable suggestions`,
+      `source=${g.j?.source} n=${results.length} missingArea=${missing} e.g. "${results[0]?.area ?? '—'}"`
+    )
+  }
+
+  // The area a suggestion reports must be one the matching engine accepts,
+  // otherwise the Match step fails on an unrecognised locality.
+  const auto = await req('GET', '/api/geo/autocomplete?q=Koth')
+  const sugArea = auto.j?.results?.[0]?.area
+  const mArea = await req('POST', '/api/match', { categoryKey: 'plumber', area: sugArea, urgency: 'NORMAL' })
+  ok(mArea.s === 200 && !!mArea.j?.best, 'a suggestion area is immediately matchable', `area="${sugArea}" -> ${mArea.j?.best?.name ?? mArea.j?.error}`)
+
+  // And the server names the offending field instead of a combined message.
+  r = await req('POST', '/api/match', { categoryKey: 'plumber', area: '', urgency: 'NORMAL' })
+  ok(r.s === 400 && /area/i.test(r.j?.error ?? ''), 'a blank area is reported as an area problem', r.j?.error)
+  r = await req('POST', '/api/match', { area: 'Kothrud', urgency: 'NORMAL' })
+  ok(r.s === 400 && /categoryKey/i.test(r.j?.error ?? ''), 'a missing categoryKey is reported as such', r.j?.error)
+
   // ---------- 1b. CLIENT LOGIN CONTRACT (regression) ----------
   // Regression guard. Every role button, the role switcher, the platform
   // console and the SIH demo launcher sign in through the client. They used to
