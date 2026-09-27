@@ -139,10 +139,8 @@ hall, a missing key or a rate limit degrades gracefully instead of breaking.
 The UI tells you which source answered (`Verified by GeoApify` vs
 `Offline service-grid fallback in use`).
 
-When keys are present, real road distance and turn-by-turn duration replace the
-straight-line estimate in the matching engine, and the customer's booking flow
-gets type-ahead address search plus a working "use current location" (reverse
-geocoded to a named locality, not thrown away).
+When keys are present, real road distance and turn-by-turn duration replace the straight-line estimate in the matching engine, and the customer's booking flow gets type-ahead address search plus a working "use current location" (reverse geocoded to a named locality, not thrown away).
+
 
 ---
 
